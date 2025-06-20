@@ -3,3 +3,4 @@ matplotlib
 boto3
 pandas
 gunicorn
+python-dotenv
