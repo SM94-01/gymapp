@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block title %}Allenamento - GymApp{% endblock %}
+
+{% block content %}
+<h2>Allenamento</h2>
+
+{# Flash messages standard #}
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title" id="alertModalLabel">Attenzione</h5>
+          </div>
+          <div class="modal-body">
+            {{ messages[0] }}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endwith %}
+
+{# Modal allenamento finito #}
+{% if finished %}
+  <div class="modal fade" id="finishedModal" tabindex="-1" aria-labelledby="finishedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="finishedModalLabel">Allenamento completato! 🎉</h5>
+        </div>
+        <div class="modal-body">
+          Complimenti, hai completato tutti gli esercizi.
+        </div>
+        <div class="modal-footer">
+          <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Torna alla Dashboard</a>
+          <button type="button" class="btn btn-secondary" id="terminateBtn">Termina allenamento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="card p-3 mb-4 shadow">
+    <h4 class="mb-2">Esercizio: <strong>{{ exercise.name }}</strong></h4>
+    <p><strong>Gruppo muscolare:</strong> {{ exercise.muscle_group }}</p>
+    <p><strong>Serie:</strong> {{ exercise.sets }} | <strong>Ripetizioni:</strong> {{ exercise.reps }}</p>
+    <p><strong>Peso attuale:</strong> {{ exercise.weight }} kg</p>
+  </div>
+
+  <form method="POST" id="exercise-form" action="{{ url_for('allenamento') }}">
+    <input type="hidden" name="new_weight" id="new_weight_input" value="" />
+    <div class="mb-3">
+      <label>Serie completate:</label>
+      <div>
+        {% if exercise.sets and exercise.sets > 0 %}
+          {% for i in range(exercise.sets) %}
+            <div class="form-check form-check-inline">
+              <input class="form-check-input set-checkbox"
+                     type="checkbox"
+                     id="set{{ i }}"
+                     name="completed_sets"
+                     value="{{ i }}"
+                     {% if set_progress[i] %}checked{% endif %}
+                     {% if i > 0 and not set_progress[i-1] %}disabled{% endif %}>
+              <label class="form-check-label" for="set{{ i }}">Serie {{ i + 1 }}</label>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p>Nessuna serie disponibile</p>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+
+  {# Modal recupero con timer #}
+  <div class="modal fade" id="restModal" tabindex="-1" aria-labelledby="restModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="restModalLabel">Recupero: 10 secondi</h5>
+        </div>
+        <div class="modal-body">
+          <p>Timer di recupero in corso...</p>
+          <div id="weightFormContainer" class="mb-3">
+            <label for="new_weight" class="form-label">Modifica peso (kg):</label>
+            <input type="number" step="0.1" min="0" id="new_weight" name="new_weight" class="form-control" />
+            <button type="button" class="btn btn-success mt-3" id="saveProgressBtn">Salva Progresso</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const checkboxes = document.querySelectorAll('.set-checkbox');
+  const restModalEl = document.getElementById('restModal');
+  const restModal = restModalEl ? new bootstrap.Modal(restModalEl) : null;
+  const newWeightInput = document.getElementById('new_weight');
+  const hiddenNewWeight = document.getElementById('new_weight_input');
+  const saveProgressBtn = document.getElementById('saveProgressBtn');
+  const exerciseForm = document.getElementById('exercise-form');
+  const weightFormContainer = document.getElementById('weightFormContainer');
+  const finishedModalEl = document.getElementById('finishedModal');
+  const finishedModal = finishedModalEl ? new bootstrap.Modal(finishedModalEl) : null;
+  const terminateBtn = document.getElementById('terminateBtn');
+
+  let timerInterval;
+  let timerSeconds = 10;
+
+  function startTimer() {
+    timerSeconds = 10;
+    document.getElementById('restModalLabel').textContent = `Recupero: ${timerSeconds} secondi`;
+
+    timerInterval = setInterval(() => {
+      timerSeconds--;
+      document.getElementById('restModalLabel').textContent = `Recupero: ${timerSeconds} secondi`;
+      if (timerSeconds <= 0) {
+        clearInterval(timerInterval);
+        document.getElementById('restModalLabel').textContent = "Recupero terminato!";
+        hiddenNewWeight.value = newWeightInput.value || '';
+        restModal.hide();
+        exerciseForm.submit();
+      }
+    }, 1000);
+  }
+
+  if (checkboxes.length > 0) {
+    checkboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        let idx = parseInt(cb.value);
+        // Non permettere di spuntare serie se la precedente non è completata
+        if (idx > 0 && (!checkboxes[idx - 1] || !checkboxes[idx - 1].checked)) {
+          cb.checked = false;
+          return;
+        }
+        if (cb.checked) {
+          restModal.show();
+          weightFormContainer.style.display = 'block';
+          startTimer();
+        }
+      });
+    });
+  }
+
+  if (saveProgressBtn) {
+    saveProgressBtn.addEventListener('click', () => {
+      fetch(exerciseForm.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(new FormData(exerciseForm))
+      }).then(response => {
+        if (!response.ok) throw new Error("Errore nel salvataggio peso");
+        return response.text();
+      }).then(() => {
+        console.log("Peso aggiornato con successo");
+        weightFormContainer.style.display = 'none';
+      }).catch(err => {
+        console.error(err);
+        alert("Errore durante il salvataggio del peso.");
+      });
+    });
+  }
+
+  // Mostra il modal allenamento completato se finished=True
+  if (finishedModal) {
+    finishedModal.show();
+  }
+
+  // Gestione bottone Termina allenamento
+  if (terminateBtn) {
+    terminateBtn.addEventListener('click', () => {
+      window.location.href = "{{ url_for('dashboard') }}";
+    });
+  }
+
+  // Se esiste il modal alert per flash message, mostralo
+  const alertModalEl = document.getElementById('alertModal');
+  if(alertModalEl){
+    const alertModal = new bootstrap.Modal(alertModalEl);
+    alertModal.show();
+  }
+});
+</script>
+{% endblock %}
