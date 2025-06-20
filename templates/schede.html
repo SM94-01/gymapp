@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}Schede - GymApp{% endblock %}
+
+{% block content %}
+<h2>Schede di Allenamento</h2>
+
+<!-- Creazione nuova scheda -->
+<form method="POST" class="mb-4">
+  <input type="hidden" name="action" value="create" />
+  <div class="input-group mb-3" style="max-width: 400px;">
+    <input type="text" name="workout_name" class="form-control" placeholder="Nome nuova scheda" required>
+    <button class="btn btn-success" type="submit">Crea Scheda</button>
+  </div>
+</form>
+
+<hr>
+
+<!-- Lista schede -->
+{% for workout in workouts %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>{{ workout.name }}</strong>
+    <div>
+      {% if workout.active %}
+        <span class="badge bg-success me-2">Attiva</span>
+      {% endif %}
+      {% if workout.saved %}
+        <span class="badge bg-secondary me-2">Salvata</span>
+      {% endif %}
+
+      <!-- Bottone attiva/disattiva -->
+      {% if workout.active %}
+        <form method="POST" class="d-inline">
+          <input type="hidden" name="action" value="deactivate" />
+          <input type="hidden" name="workout_id" value="{{ workout.id }}" />
+          <button type="submit" class="btn btn-sm btn-warning me-2">Disattiva</button>
+        </form>
+      {% else %}
+        <form method="POST" class="d-inline">
+          <input type="hidden" name="action" value="activate" />
+          <input type="hidden" name="workout_id" value="{{ workout.id }}" />
+          <button type="submit" class="btn btn-sm btn-primary me-2">Attiva</button>
+        </form>
+      {% endif %}
+
+      <!-- Bottone salva, solo se non è già salvata -->
+      {% if not workout.saved %}
+        <form method="POST" class="d-inline">
+          <input type="hidden" name="action" value="save" />
+          <input type="hidden" name="workout_id" value="{{ workout.id }}" />
+          <button type="submit" class="btn btn-sm btn-success me-2">Salva</button>
+        </form>
+      {% endif %}
+
+      <!-- Bottone elimina, sempre visibile -->
+      <form method="POST" class="d-inline" onsubmit="return confirm('Eliminare questa scheda?');">
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="workout_id" value="{{ workout.id }}" />
+        <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <h5>Esercizi</h5>
+    <ul class="list-group mb-3">
+      {% for ex in exercises_map[workout.id] %}
+        <li class="list-group-item">
+          {{ ex.name }} — Serie: {{ ex.sets }}, Ripetizioni: {{ ex.reps }}, Peso: {{ ex.weight }} kg
+        </li>
+      {% else %}
+        <li class="list-group-item">Nessun esercizio</li>
+      {% endfor %}
+    </ul>
+
+    {% if not workout.saved %}
+    <!-- Form aggiungi esercizio -->
+    <form method="POST" class="row g-2">
+      <input type="hidden" name="action" value="add_exercise" />
+      <input type="hidden" name="workout_id" value="{{ workout.id }}" />
+
+      <div class="col-md-3">
+        <select name="muscle_group" class="form-control" required>
+          <option value="" disabled selected>Seleziona fascio muscolare</option>
+          <option value="Pettorali">Pettorali</option>
+          <option value="Dorsali">Dorsali</option>
+          <option value="Gambe">Gambe</option>
+          <option value="Spalle">Spalle</option>
+          <option value="Bicipiti">Bicipiti</option>
+          <option value="Tricipiti">Tricipiti</option>
+          <option value="Addominali">Addominali</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <input type="text" name="exercise_name" class="form-control" placeholder="Nome esercizio" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="sets" class="form-control" placeholder="Serie" min="1" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="reps" class="form-control" placeholder="Ripetizioni" min="1" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="weight" class="form-control" placeholder="Peso (kg)" step="0.1" min="0" required>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-secondary w-100">Aggiungi esercizio</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<p>Nessuna scheda creata finora.</p>
+{% endfor %}
+{% endblock %}
