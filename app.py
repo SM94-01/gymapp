@@ -139,7 +139,7 @@ def dashboard():
 def schede():
     global workouts_df, exercises_df, session
 
-    user_id = session.get('user_id')
+    user_id = int(session.get('user_id'))
     if not user_id:
         return redirect(url_for('select_user'))
 
