@@ -361,7 +361,7 @@ def allenamento():
     # --- GET: mostra pagina ---
 
     # Se allenamento non iniziato (prima di start)
-    exercise_index = int(session.get('exercise_index', 0))
+    exercise_index = session.get('exercise_index', 0)
 
     # Se non è stato avviato ancora
     if exercise_index is None:
