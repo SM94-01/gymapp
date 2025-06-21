@@ -1,5 +1,3 @@
-# Questo è il backend Flask equivalente della tua app Streamlit, usando file Excel invece di SQLite
-
 from flask import Flask, request, render_template, redirect, url_for, session, flash
 import pandas as pd
 from datetime import datetime
@@ -317,7 +315,7 @@ def allenamento():
 
 @app.route('/progressi')
 def progressi():
-    user_id = session.get('user_id')
+    user_id = int(session.get('user_id'))
     if not user_id:
         return redirect(url_for('select_user'))
 
@@ -357,9 +355,14 @@ def progressi():
 
     # Grafico 2: volume totale per gruppo muscolare nel tempo (peso * serie)
     user_logs['volume'] = user_logs['weight'] * user_logs['completed_sets']
-    grouped_muscle = user_logs.groupby([pd.Grouper(key='timestamp', freq='W')]).apply(
-        lambda df: df.merge(exercises_df[['id', 'muscle_group']], left_on='exercise_id', right_on='id').groupby('muscle_group')['volume'].sum()
-    ).unstack().fillna(0)
+    # Aggiunge 'muscle_group' a user_logs
+    user_logs = user_logs.merge(exercises_df[['id', 'muscle_group']], left_on='exercise_id', right_on='id', how='left')
+
+    # Raggruppa per settimana e gruppo muscolare
+    grouped_muscle = user_logs.groupby([
+        pd.Grouper(key='timestamp', freq='W'),
+        'muscle_group'
+    ])['volume'].sum().unstack().fillna(0)
 
     plt.figure(figsize=(10,6))
     for muscle_group in grouped_muscle.columns:
