@@ -26,88 +26,91 @@
   {% endif %}
 {% endwith %}
 
-<!-- Bottone iniziale -->
-<div id="startContainer" class="text-center my-5">
-  <button class="btn btn-lg btn-primary" id="startWorkoutBtn">Avvia Allenamento</button>
-</div>
-
-<!-- Contenuto nascosto inizialmente -->
-<div id="workoutContent" style="display: none;">
-  {% if finished %}
-    <div class="modal fade" id="finishedModal" tabindex="-1" aria-labelledby="finishedModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-success text-white">
-            <h5 class="modal-title" id="finishedModalLabel">Allenamento completato! 🎉</h5>
-          </div>
-          <div class="modal-body">
-            Complimenti, hai completato tutti gli esercizi.
-          </div>
-          <div class="modal-footer">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Torna alla Dashboard</a>
-            <button type="button" class="btn btn-secondary" id="terminateBtn">Termina allenamento</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  {% else %}
-    <div class="card p-3 mb-4 shadow">
-      <h4 class="mb-2">Esercizio: <strong>{{ exercise.name }}</strong></h4>
-      <p><strong>Gruppo muscolare:</strong> {{ exercise.muscle_group }}</p>
-      <p><strong>Serie:</strong> {{ exercise.sets }} | <strong>Ripetizioni:</strong> {{ exercise.reps }}</p>
-      <p><strong>Peso attuale:</strong> {{ exercise.weight }} kg</p>
-    </div>
-
-    <form method="POST" id="exercise-form" action="{{ url_for('allenamento') }}">
-      <input type="hidden" name="new_weight" id="new_weight_input" value="" />
-      <div class="mb-3">
-        <label>Serie completate:</label>
-        <div>
-          {% if exercise.sets and exercise.sets > 0 %}
-            {% for i in range(exercise.sets) %}
-              <div class="form-check form-check-inline">
-                <input class="form-check-input set-checkbox"
-                       type="checkbox"
-                       id="set{{ i }}"
-                       name="completed_sets"
-                       value="{{ i }}"
-                       {% if set_progress[i] %}checked{% endif %}
-                       {% if i > 0 and not set_progress[i-1] %}disabled{% endif %}>
-                <label class="form-check-label" for="set{{ i }}">Serie {{ i + 1 }}</label>
-              </div>
-            {% endfor %}
-          {% else %}
-            <p>Nessuna serie disponibile</p>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Bottone per passare manualmente all'esercizio successivo -->
-      <div class="mt-4">
-        <button type="submit" class="btn btn-primary" id="nextExerciseBtn" disabled>Passa all'esercizio successivo</button>
-      </div>
-    </form>
-
-    <!-- Modal recupero con timer -->
-    <div class="modal fade" id="restModal" tabindex="-1" aria-labelledby="restModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="restModalLabel">Recupero: 10 secondi</h5>
-          </div>
-          <div class="modal-body">
-            <p>Timer di recupero in corso...</p>
-            <div id="weightFormContainer" class="mb-3">
-              <label for="new_weight" class="form-label">Modifica peso (kg):</label>
-              <input type="number" step="0.1" min="0" id="new_weight" name="new_weight" class="form-control" />
-              <button type="button" class="btn btn-success mt-3" id="saveProgressBtn">Salva Progresso</button>
+{# Mostra bottone "Avvia Allenamento" solo se allenamento non iniziato #}
+{% if exercise is none and not finished %}
+  <form method="POST" action="{{ url_for('allenamento') }}" onsubmit="disableStartButton()">
+    <button class="btn btn-lg btn-primary" type="submit" name="start_workout" value="1" id="startWorkoutBtn">
+      Avvia Allenamento
+    </button>
+  </form>
+{% else %}
+  <div id="workoutContent">
+    {% if finished %}
+      <div class="modal fade show" id="finishedModal" tabindex="-1" aria-labelledby="finishedModalLabel" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+              <h5 class="modal-title" id="finishedModalLabel">Allenamento completato! 🎉</h5>
+            </div>
+            <div class="modal-body">
+              Complimenti, hai completato tutti gli esercizi.
+            </div>
+            <div class="modal-footer">
+              <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Torna alla Dashboard</a>
+              <button type="button" class="btn btn-secondary" id="terminateBtn">Termina allenamento</button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  {% endif %}
-</div>
+    {% else %}
+      <div class="card p-3 mb-4 shadow">
+        <h4 class="mb-2">Esercizio: <strong>{{ exercise.name }}</strong></h4>
+        <p><strong>Gruppo muscolare:</strong> {{ exercise.muscle_group }}</p>
+        <p><strong>Serie:</strong> {{ exercise.sets }} | <strong>Ripetizioni:</strong> {{ exercise.reps }}</p>
+        <p><strong>Peso attuale:</strong> {{ exercise.weight }} kg</p>
+      </div>
+
+      <form method="POST" id="exercise-form" action="{{ url_for('allenamento') }}">
+        <input type="hidden" name="new_weight" id="new_weight_input" value="" />
+        <div class="mb-3">
+          <label>Serie completate:</label>
+          <div>
+            {% if exercise.sets and exercise.sets > 0 %}
+              {% for i in range(exercise.sets) %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input set-checkbox"
+                         type="checkbox"
+                         id="set{{ i }}"
+                         name="completed_sets"
+                         value="{{ i }}"
+                         {% if set_progress[i] %}checked{% endif %}
+                         {% if i > 0 and not set_progress[i-1] %}disabled{% endif %}>
+                  <label class="form-check-label" for="set{{ i }}">Serie {{ i + 1 }}</label>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p>Nessuna serie disponibile</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Bottone per passare manualmente all'esercizio successivo -->
+        <div class="mt-4">
+          <button type="submit" class="btn btn-primary" id="nextExerciseBtn" disabled>Passa all'esercizio successivo</button>
+        </div>
+      </form>
+
+      <!-- Modal recupero con timer -->
+      <div class="modal fade" id="restModal" tabindex="-1" aria-labelledby="restModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="restModalLabel">Recupero: 10 secondi</h5>
+            </div>
+            <div class="modal-body">
+              <p>Timer di recupero in corso...</p>
+              <div id="weightFormContainer" class="mb-3">
+                <label for="new_weight" class="form-label">Modifica peso (kg):</label>
+                <input type="number" step="0.1" min="0" id="new_weight" name="new_weight" class="form-control" />
+                <button type="button" class="btn btn-success mt-3" id="saveProgressBtn">Salva Progresso</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -125,10 +128,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const finishedModal = finishedModalEl ? new bootstrap.Modal(finishedModalEl) : null;
   const terminateBtn = document.getElementById('terminateBtn');
   const startWorkoutBtn = document.getElementById('startWorkoutBtn');
-  const workoutContent = document.getElementById('workoutContent');
-  const startContainer = document.getElementById('startContainer');
-  const nextExerciseBtn = document.getElementById('nextExerciseBtn');
 
+  // Mostra alert modal se esiste
+  const alertModalEl = document.getElementById('alertModal');
+  if (alertModalEl) {
+    const alertModal = new bootstrap.Modal(alertModalEl);
+    alertModal.show();
+  }
+
+  // Timer recupero e gestione modale
   let timerInterval;
   let timerSeconds = 10;
 
@@ -144,33 +152,49 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('restModalLabel').textContent = "Recupero terminato!";
         hiddenNewWeight.value = newWeightInput.value || '';
         restModal.hide();
-
-        // NON inviamo automaticamente il form
       }
     }, 1000);
   }
 
   if (checkboxes.length > 0) {
+    function updateCheckboxes() {
+      for (let i = 0; i < checkboxes.length; i++) {
+        if (i === 0) {
+          checkboxes[i].disabled = false;
+        } else {
+          checkboxes[i].disabled = !checkboxes[i - 1].checked;
+        }
+      }
+    }
+
+    updateCheckboxes();
+
     checkboxes.forEach(cb => {
       cb.addEventListener('change', () => {
-        let idx = parseInt(cb.value);
-        if (idx > 0 && (!checkboxes[idx - 1] || !checkboxes[idx - 1].checked)) {
+        const idx = parseInt(cb.value);
+
+        if (idx > 0 && !checkboxes[idx - 1].checked) {
           cb.checked = false;
           return;
         }
+
+        updateCheckboxes();
+
         if (cb.checked) {
           restModal.show();
           weightFormContainer.style.display = 'block';
           startTimer();
-
-          // Abilita "Passa all'esercizio successivo" se tutte le serie sono completate
-          const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-          if (allChecked && nextExerciseBtn) {
-            nextExerciseBtn.disabled = false;
-          }
         }
+
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        const nextExerciseBtn = document.getElementById('nextExerciseBtn');
+        if(nextExerciseBtn) nextExerciseBtn.disabled = !allChecked;
       });
     });
+
+    const allCheckedInit = Array.from(checkboxes).every(cb => cb.checked);
+    const nextExerciseBtn = document.getElementById('nextExerciseBtn');
+    if(nextExerciseBtn) nextExerciseBtn.disabled = !allCheckedInit;
   }
 
   if (saveProgressBtn) {
@@ -201,21 +225,6 @@ document.addEventListener('DOMContentLoaded', function () {
   if (terminateBtn) {
     terminateBtn.addEventListener('click', () => {
       window.location.href = "{{ url_for('dashboard') }}";
-    });
-  }
-
-  // Mostra alert modal se esiste
-  const alertModalEl = document.getElementById('alertModal');
-  if (alertModalEl) {
-    const alertModal = new bootstrap.Modal(alertModalEl);
-    alertModal.show();
-  }
-
-  // Mostra contenuto solo dopo clic su "Avvia Allenamento"
-  if (startWorkoutBtn && workoutContent && startContainer) {
-    startWorkoutBtn.addEventListener('click', () => {
-      startContainer.style.display = 'none';
-      workoutContent.style.display = 'block';
     });
   }
 });
