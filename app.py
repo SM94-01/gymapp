@@ -138,14 +138,14 @@ def home():
 def select_user():
     if request.method == 'POST':
         if 'user_id' in request.form:
-            user_id = request.form['user_id']
+            user_id = int(request.form['user_id'])
             session['user_id'] = int(new_user_id)
             flash('Utente selezionato.')
             return redirect(url_for('dashboard'))
         elif 'new_user' in request.form and request.form['new_user'].strip():
             new_user_name = request.form['new_user'].strip()
             new_user_id = add_user(new_user_name)
-            session['user_id'] = new_user_id
+            session['user_id'] = int(new_user_id)
             flash(f'Nuovo utente "{new_user_name}" aggiunto e selezionato.')
             return redirect(url_for('dashboard'))
         else:
