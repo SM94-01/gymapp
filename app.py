@@ -452,43 +452,44 @@ def progressi():
     if user_logs.empty:
         return render_template('progressi.html', message="Nessun progresso registrato.")
 
+    # Conversione timestamp e gestione colonne
     user_logs['timestamp'] = pd.to_datetime(user_logs['timestamp'])
     user_logs['date'] = user_logs['timestamp'].dt.date
 
+    # Merge con esercizi
     merged = user_logs.merge(
         exercises_df[['id', 'name', 'muscle_group']],
         left_on='exercise_id',
         right_on='id'
     )
 
-    print("Merged dataframe:", merged.shape)
-    print(merged.head())
-
+    # Pulizia e casting dei dati
     merged['weight'] = pd.to_numeric(merged['weight'], errors='coerce').fillna(0)
     merged['completed_sets'] = pd.to_numeric(merged['completed_sets'], errors='coerce').fillna(0)
 
-    daily_avg_weight = merged.groupby(['date', 'name'])['weight'].mean().reset_index()
-    print("daily_avg_weight:", daily_avg_weight.head())
+    # Timestamp arrotondato al minuto per maggiore granularità
+    merged['time'] = merged['timestamp'].dt.floor('min')
 
-    daily_volume = merged.copy()
-    daily_volume['volume'] = daily_volume['weight'] * daily_volume['completed_sets']
-    daily_volume = daily_volume.groupby(['date', 'muscle_group'])['volume'].sum().reset_index()
-    print("daily_volume:", daily_volume.head())
+    # Calcolo volume
+    merged['volume'] = merged['weight'] * merged['completed_sets']
+
+    # Filtra solo i record significativi per i grafici
+    filtered = merged[merged['weight'] > 0].copy()
 
     # ========================
-    # 1. Grafico peso medio per esercizio (per giorno)
+    # 1. Grafico peso medio per esercizio nel tempo
     # ========================
-    daily_avg_weight = (
-        merged.groupby(['date', 'name'])['weight']
+    avg_weight = (
+        filtered.groupby(['time', 'name'])['weight']
         .mean()
         .reset_index()
     )
 
-    fig1, ax1 = plt.subplots(figsize=(8, 4))
-    for name, group in daily_avg_weight.groupby('name'):
-        ax1.plot(group['date'], group['weight'], label=name)
-    ax1.set_title("Peso medio per esercizio (giornaliero)")
-    ax1.set_xlabel("Data")
+    fig1, ax1 = plt.subplots(figsize=(10, 4))
+    for name, group in avg_weight.groupby('name'):
+        ax1.plot(group['time'], group['weight'], label=name, marker='o')
+    ax1.set_title("Peso medio per esercizio")
+    ax1.set_xlabel("Orario")
     ax1.set_ylabel("Peso (kg)")
     ax1.legend(fontsize=8)
     ax1.grid(True)
@@ -500,21 +501,19 @@ def progressi():
     plot_ex = base64.b64encode(buf1.getvalue()).decode()
 
     # ========================
-    # 2. Grafico volume per gruppo muscolare (per giorno)
-    # Volume = peso * serie completate
+    # 2. Grafico volume per gruppo muscolare nel tempo
     # ========================
-    merged['volume'] = merged['weight'] * merged['completed_sets']
     daily_volume = (
-        merged.groupby(['date', 'muscle_group'])['volume']
+        filtered.groupby(['time', 'muscle_group'])['volume']
         .sum()
         .reset_index()
     )
 
-    fig2, ax2 = plt.subplots(figsize=(8, 4))
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
     for group, data in daily_volume.groupby('muscle_group'):
-        ax2.plot(data['date'], data['volume'], label=group)
-    ax2.set_title("Volume giornaliero per gruppo muscolare")
-    ax2.set_xlabel("Data")
+        ax2.plot(data['time'], data['volume'], label=group, marker='o')
+    ax2.set_title("Volume per gruppo muscolare")
+    ax2.set_xlabel("Orario")
     ax2.set_ylabel("Volume (kg x serie)")
     ax2.legend(fontsize=8)
     ax2.grid(True)
@@ -529,14 +528,14 @@ def progressi():
     # Statistiche riepilogo
     # ========================
     total_sessions = user_logs['date'].nunique()
-    max_weight = user_logs['weight'].max()
+    max_weight = round(user_logs['weight'].max(), 2)
 
     return render_template(
         'progressi.html',
         plot_ex=plot_ex,
         plot_muscle=plot_muscle,
-        total_sessions=user_logs['date'].nunique(),
-        max_weight=round(user_logs['weight'].max(), 2)
+        total_sessions=total_sessions,
+        max_weight=max_weight
     )
 
 if __name__ == '__main__':
