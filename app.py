@@ -355,7 +355,6 @@ def allenamento():
                     new_w = float(new_weight)
                     exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
                     save_all()
-                    global exercises_df  # assicurati che venga aggiornato il globale
                     exercises_df = download_excel(EXERCISES_FILE)
                     return '', 204
                 except ValueError:
@@ -370,7 +369,6 @@ def allenamento():
                 new_w = float(new_weight)
                 exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
                 save_all()
-                global exercises_df
                 exercises_df = download_excel(EXERCISES_FILE)
             except ValueError:
                 flash("Peso non valido, non aggiornato.")
