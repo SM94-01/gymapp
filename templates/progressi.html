@@ -8,14 +8,16 @@
 {% if message %}
   <div class="alert alert-info">{{ message }}</div>
 {% else %}
+  <p class="text-muted small">I grafici mostrano l'andamento in base all'orario preciso di esecuzione (non solo per giorno).</p>
+
   <div class="row">
     <div class="col-md-6">
-      <h4>Andamento peso medio per esercizio</h4>
-      <img src="data:image/png;base64,{{ plot_ex }}" alt="Grafico esercizi" class="img-fluid" />
+      <h4>Andamento del peso medio per esercizio (nel tempo)</h4>
+      <img src="data:image/png;base64,{{ plot_ex }}" alt="Grafico esercizi" class="img-fluid d-block mx-auto" />
     </div>
     <div class="col-md-6">
-      <h4>Volume totale per gruppo muscolare</h4>
-      <img src="data:image/png;base64,{{ plot_muscle }}" alt="Grafico gruppi muscolari" class="img-fluid" />
+      <h4>Volume per gruppo muscolare (nel tempo)</h4>
+      <img src="data:image/png;base64,{{ plot_muscle }}" alt="Grafico gruppi muscolari" class="img-fluid d-block mx-auto" />
     </div>
   </div>
 
