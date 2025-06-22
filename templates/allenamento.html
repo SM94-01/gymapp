@@ -95,7 +95,7 @@
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="restModalLabel">Recupero: 10 secondi</h5>
+              <h5 class="modal-title" id="restModalLabel">Recupero: 60 secondi</h5>
             </div>
             <div class="modal-body">
               <p>Timer di recupero in corso...</p>
@@ -138,10 +138,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Timer recupero e gestione modale
   let timerInterval;
-  let timerSeconds = 10;
+  let timerSeconds = 60;
 
   function startTimer() {
-    timerSeconds = 10;
+    timerSeconds = 60;
     document.getElementById('restModalLabel').textContent = `Recupero: ${timerSeconds} secondi`;
 
     timerInterval = setInterval(() => {
