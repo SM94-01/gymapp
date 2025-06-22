@@ -47,7 +47,7 @@
             </div>
             <div class="modal-footer">
               <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Torna alla Dashboard</a>
-              <form method="POST" action="{{ url_for('allenamento') }}">
+              <form method="POST" action="{{ url_for('allenamento') }}" id="terminateForm">
                 <button type="submit" class="btn btn-secondary">Termina allenamento</button>
               </form>
             </div>
@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const weightFormContainer = document.getElementById('weightFormContainer');
   const finishedModalEl = document.getElementById('finishedModal');
   const finishedModal = finishedModalEl ? new bootstrap.Modal(finishedModalEl) : null;
-  const terminateBtn = document.getElementById('terminateBtn');
+  const terminateForm = document.getElementById('terminateForm');
   const startWorkoutBtn = document.getElementById('startWorkoutBtn');
 
   // Mostra alert modal se esiste
@@ -218,6 +218,12 @@ document.addEventListener('DOMContentLoaded', function () {
         console.error(err);
         alert("Errore durante il salvataggio del peso.");
       });
+    });
+  }
+
+  if (terminateForm && finishedModal) {
+    terminateForm.addEventListener('submit', function () {
+      finishedModal.hide();  // Chiude il modal quando termini allenamento
     });
   }
 
