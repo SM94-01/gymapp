@@ -59,7 +59,13 @@
         <h4 class="mb-2">Esercizio: <strong>{{ exercise.name }}</strong></h4>
         <p><strong>Gruppo muscolare:</strong> {{ exercise.muscle_group }}</p>
         <p><strong>Serie:</strong> {{ exercise.sets }} | <strong>Ripetizioni:</strong> {{ exercise.reps }}</p>
-        <p><strong>Peso attuale:</strong> {{ exercise.weight }} kg</p>
+        <p><strong>Peso attuale:</strong>
+          {% if exercise.weight is none %}
+            Non impostato
+          {% else %}
+            {{ exercise.weight }} kg
+          {% endif %}
+        </p>
       </div>
 
       <form method="POST" id="exercise-form" action="{{ url_for('allenamento') }}">
