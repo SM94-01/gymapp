@@ -29,7 +29,6 @@
         <span class="badge bg-secondary me-2">Salvata</span>
       {% endif %}
 
-      <!-- Bottone attiva/disattiva -->
       {% if workout.active %}
         <form method="POST" class="d-inline">
           <input type="hidden" name="action" value="deactivate" />
@@ -44,7 +43,6 @@
         </form>
       {% endif %}
 
-      <!-- Bottone salva, solo se non è già salvata -->
       {% if not workout.saved %}
         <form method="POST" class="d-inline">
           <input type="hidden" name="action" value="save" />
@@ -53,7 +51,6 @@
         </form>
       {% endif %}
 
-      <!-- Bottone elimina, sempre visibile -->
       <form method="POST" class="d-inline" onsubmit="return confirm('Eliminare questa scheda?');">
         <input type="hidden" name="action" value="delete" />
         <input type="hidden" name="workout_id" value="{{ workout.id }}" />
@@ -66,8 +63,22 @@
     <h5>Esercizi</h5>
     <ul class="list-group mb-3">
       {% for ex in exercises_map[workout.id] %}
-        <li class="list-group-item">
-          {{ ex.name }} — Serie: {{ ex.sets }}, Ripetizioni: {{ ex.reps }}, Peso: {{ ex.weight }} kg
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ ex.name }}</strong> — Serie: {{ ex.sets }}, Ripetizioni: {{ ex.reps }}
+          </div>
+          <div class="btn-group btn-group-sm">
+            <!-- Bottone modifica -->
+            <button type="button" class="btn btn-outline-primary"
+              onclick="showEditExerciseForm({{ workout.id }}, {{ ex.id }}, '{{ ex.name }}', {{ ex.sets }}, {{ ex.reps }}, '{{ ex.muscle_group }}')">Modifica</button>
+
+            <!-- Bottone elimina -->
+            <form method="POST" onsubmit="return confirm('Eliminare questo esercizio?');">
+              <input type="hidden" name="action" value="delete_exercise" />
+              <input type="hidden" name="exercise_id" value="{{ ex.id }}" />
+              <button type="submit" class="btn btn-outline-danger">Elimina</button>
+            </form>
+          </div>
         </li>
       {% else %}
         <li class="list-group-item">Nessun esercizio</li>
@@ -76,7 +87,7 @@
 
     {% if not workout.saved %}
     <!-- Form aggiungi esercizio -->
-    <form method="POST" class="row g-2">
+    <form method="POST" class="row g-2 mb-3">
       <input type="hidden" name="action" value="add_exercise" />
       <input type="hidden" name="workout_id" value="{{ workout.id }}" />
 
@@ -93,7 +104,7 @@
         </select>
       </div>
 
-      <div class="col-md-4">
+      <div class="col-md-3">
         <input type="text" name="exercise_name" class="form-control" placeholder="Nome esercizio" required>
       </div>
       <div class="col-md-2">
@@ -103,16 +114,61 @@
         <input type="number" name="reps" class="form-control" placeholder="Ripetizioni" min="1" required>
       </div>
       <div class="col-md-2">
-        <input type="number" name="weight" class="form-control" placeholder="Peso (kg)" step="0.1" min="0" required>
-      </div>
-      <div class="col-md-2">
         <button type="submit" class="btn btn-secondary w-100">Aggiungi esercizio</button>
       </div>
     </form>
     {% endif %}
+
+    <!-- Form modifica esercizio -->
+    <form method="POST" id="editExerciseForm" class="row g-2 d-none">
+      <input type="hidden" name="action" value="edit_exercise" />
+      <input type="hidden" name="exercise_id" id="editExerciseId" />
+      <input type="hidden" name="workout_id" id="editWorkoutId" />
+
+      <div class="col-md-3">
+        <select name="muscle_group" class="form-control" id="editMuscleGroup" required>
+          <option value="Pettorali">Pettorali</option>
+          <option value="Dorsali">Dorsali</option>
+          <option value="Gambe">Gambe</option>
+          <option value="Spalle">Spalle</option>
+          <option value="Bicipiti">Bicipiti</option>
+          <option value="Tricipiti">Tricipiti</option>
+          <option value="Addominali">Addominali</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <input type="text" name="exercise_name" class="form-control" id="editExerciseName" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="sets" class="form-control" id="editSets" min="1" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" name="reps" class="form-control" id="editReps" min="1" required>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-warning w-100">Salva modifiche</button>
+      </div>
+    </form>
   </div>
 </div>
 {% else %}
 <p>Nessuna scheda creata finora.</p>
 {% endfor %}
+
+<script>
+function showEditExerciseForm(workoutId, exerciseId, name, sets, reps, muscleGroup) {
+  const form = document.getElementById('editExerciseForm');
+  form.classList.remove('d-none');
+
+  document.getElementById('editWorkoutId').value = workoutId;
+  document.getElementById('editExerciseId').value = exerciseId;
+  document.getElementById('editExerciseName').value = name;
+  document.getElementById('editSets').value = sets;
+  document.getElementById('editReps').value = reps;
+  document.getElementById('editMuscleGroup').value = muscleGroup;
+
+  form.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
 {% endblock %}
