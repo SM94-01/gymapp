@@ -36,6 +36,18 @@ s3 = boto3.client('s3',
                   aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
                   region_name=AWS_REGION)
 
+def get_mesi():
+    mesi = [
+        (1, "Gennaio"), (2, "Febbraio"), (3, "Marzo"),
+        (4, "Aprile"), (5, "Maggio"), (6, "Giugno"),
+        (7, "Luglio"), (8, "Agosto"), (9, "Settembre"),
+        (10, "Ottobre"), (11, "Novembre"), (12, "Dicembre")
+    ]
+    return mesi
+
+def get_anni(df):
+    return sorted(df['anno'].unique())
+
 def download_excel(file_name):
     try:
         s3_obj = s3.get_object(Bucket=S3_BUCKET, Key=file_name)
@@ -452,44 +464,39 @@ def progressi():
     if user_logs.empty:
         return render_template('progressi.html', message="Nessun progresso registrato.")
 
-    # Conversione timestamp e gestione colonne
     user_logs['timestamp'] = pd.to_datetime(user_logs['timestamp'])
     user_logs['date'] = user_logs['timestamp'].dt.date
+    user_logs['anno'] = user_logs['timestamp'].dt.year
+    user_logs['mese'] = user_logs['timestamp'].dt.month
 
-    # Merge con esercizi
-    merged = user_logs.merge(
+    # === Leggi i parametri mese/anno da query string ===
+    mese = request.args.get('mese', default=datetime.now().month, type=int)
+    anno = request.args.get('anno', default=datetime.now().year, type=int)
+
+    # === Filtra per mese/anno ===
+    filtered_logs = user_logs[(user_logs['mese'] == mese) & (user_logs['anno'] == anno)]
+    if filtered_logs.empty:
+        return render_template('progressi.html', message="Nessun dato per il periodo selezionato.",
+                               mesi=get_mesi(), anni=get_anni(user_logs),
+                               mese_corrente=mese, anno_corrente=anno)
+
+    merged = filtered_logs.merge(
         exercises_df[['id', 'name', 'muscle_group']],
         left_on='exercise_id',
         right_on='id'
     )
 
-    # Pulizia e casting dei dati
     merged['weight'] = pd.to_numeric(merged['weight'], errors='coerce').fillna(0)
     merged['completed_sets'] = pd.to_numeric(merged['completed_sets'], errors='coerce').fillna(0)
 
-    # Timestamp arrotondato al minuto per maggiore granularità
-    merged['time'] = merged['timestamp'].dt.floor('min')
+    # === Grafico 1: Peso medio per esercizio ===
+    daily_avg_weight = merged.groupby(['timestamp', 'name'])['weight'].mean().reset_index()
 
-    # Calcolo volume
-    merged['volume'] = merged['weight'] * merged['completed_sets']
-
-    # Filtra solo i record significativi per i grafici
-    filtered = merged[merged['weight'] > 0].copy()
-
-    # ========================
-    # 1. Grafico peso medio per esercizio nel tempo
-    # ========================
-    avg_weight = (
-        filtered.groupby(['time', 'name'])['weight']
-        .mean()
-        .reset_index()
-    )
-
-    fig1, ax1 = plt.subplots(figsize=(10, 4))
-    for name, group in avg_weight.groupby('name'):
-        ax1.plot(group['time'], group['weight'], label=name, marker='o')
+    fig1, ax1 = plt.subplots(figsize=(8, 4))
+    for name, group in daily_avg_weight.groupby('name'):
+        ax1.plot(group['timestamp'], group['weight'], label=name)
     ax1.set_title("Peso medio per esercizio")
-    ax1.set_xlabel("Orario")
+    ax1.set_xlabel("Data e ora")
     ax1.set_ylabel("Peso (kg)")
     ax1.legend(fontsize=8)
     ax1.grid(True)
@@ -500,20 +507,15 @@ def progressi():
     buf1.seek(0)
     plot_ex = base64.b64encode(buf1.getvalue()).decode()
 
-    # ========================
-    # 2. Grafico volume per gruppo muscolare nel tempo
-    # ========================
-    daily_volume = (
-        filtered.groupby(['time', 'muscle_group'])['volume']
-        .sum()
-        .reset_index()
-    )
+    # === Grafico 2: Volume per gruppo muscolare ===
+    merged['volume'] = merged['weight'] * merged['completed_sets']
+    daily_volume = merged.groupby(['timestamp', 'muscle_group'])['volume'].sum().reset_index()
 
-    fig2, ax2 = plt.subplots(figsize=(10, 4))
+    fig2, ax2 = plt.subplots(figsize=(8, 4))
     for group, data in daily_volume.groupby('muscle_group'):
-        ax2.plot(data['time'], data['volume'], label=group, marker='o')
+        ax2.plot(data['timestamp'], data['volume'], label=group)
     ax2.set_title("Volume per gruppo muscolare")
-    ax2.set_xlabel("Orario")
+    ax2.set_xlabel("Data e ora")
     ax2.set_ylabel("Volume (kg x serie)")
     ax2.legend(fontsize=8)
     ax2.grid(True)
@@ -524,18 +526,19 @@ def progressi():
     buf2.seek(0)
     plot_muscle = base64.b64encode(buf2.getvalue()).decode()
 
-    # ========================
-    # Statistiche riepilogo
-    # ========================
-    total_sessions = user_logs['date'].nunique()
-    max_weight = round(user_logs['weight'].max(), 2)
+    total_sessions = filtered_logs['date'].nunique()
+    max_weight = filtered_logs['weight'].max()
 
     return render_template(
         'progressi.html',
         plot_ex=plot_ex,
         plot_muscle=plot_muscle,
         total_sessions=total_sessions,
-        max_weight=max_weight
+        max_weight=round(max_weight, 2),
+        mesi=get_mesi(),
+        anni=get_anni(user_logs),
+        mese_corrente=mese,
+        anno_corrente=anno
     )
 
 if __name__ == '__main__':
