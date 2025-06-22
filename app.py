@@ -76,6 +76,14 @@ def save_all():
     upload_excel(logs_df, LOGS_FILE)
     upload_excel(cycle_df, CYCLE_FILE)
 
+def load_all():
+    global users_df, workouts_df, exercises_df, logs_df, cycle_df
+    users_df = download_excel(USERS_FILE)
+    workouts_df = download_excel(WORKOUTS_FILE)
+    exercises_df = download_excel(EXERCISES_FILE)
+    logs_df = download_excel(LOGS_FILE)
+    cycle_df = download_excel(CYCLE_FILE)
+
 def get_all_users():
     # Ritorna la lista di utenti dal DataFrame users_df
     return users_df.to_dict(orient='records')
@@ -182,19 +190,23 @@ def schede():
                                        columns=['id', 'user_id', 'name', 'active', 'saved'])
                 workouts_df = pd.concat([workouts_df, new_row], ignore_index=True)
                 save_all()
+                load_all()
 
         elif action == 'delete':
             workouts_df = workouts_df[workouts_df['id'] != workout_id]
             exercises_df = exercises_df[exercises_df['workout_id'] != workout_id]
             save_all()
+            load_all()
 
         elif action == 'activate':
             workouts_df.loc[workouts_df['id'] == workout_id, 'active'] = True
             save_all()
+            load_all()
 
         elif action == 'deactivate':
             workouts_df.loc[workouts_df['id'] == workout_id, 'active'] = False
             save_all()
+            load_all()
 
         elif action == 'save':
             workouts_df.loc[workouts_df['id'] == workout_id, 'saved'] = True
@@ -211,6 +223,7 @@ def schede():
                 s3.upload_fileobj(buffer, S3_BUCKET, s3_key)
 
             save_all()
+            load_all()
             flash("Scheda salvata e caricata su S3 ✅")
 
         elif action == 'add_exercise':
@@ -226,6 +239,7 @@ def schede():
                                   columns=['id', 'workout_id', 'name', 'muscle_group', 'sets', 'reps', 'weight'])
             exercises_df = pd.concat([exercises_df, new_ex], ignore_index=True)
             save_all()
+            load_all()
 
         elif action == 'edit_exercise':
             exercise_id = int(request.form.get('exercise_id'))
@@ -239,6 +253,7 @@ def schede():
                     exercises_df.loc[exercises_df['id'] == exercise_id, 'sets'] = int(request.form.get('sets'))
                     exercises_df.loc[exercises_df['id'] == exercise_id, 'reps'] = int(request.form.get('reps'))
                     save_all()
+                    load_all()
 
         elif action == 'delete_exercise':
             exercise_id = int(request.form.get('exercise_id'))
@@ -246,6 +261,7 @@ def schede():
             if workout_id > 0 and not workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]:
                 exercises_df = exercises_df[exercises_df['id'] != exercise_id]
                 save_all()
+                load_all()
 
         return redirect(url_for('schede'))
 
