@@ -47,7 +47,9 @@
             </div>
             <div class="modal-footer">
               <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Torna alla Dashboard</a>
-              <button type="button" class="btn btn-secondary" id="terminateBtn">Termina allenamento</button>
+              <form method="POST" action="{{ url_for('allenamento') }}">
+                <button type="submit" class="btn btn-secondary">Termina allenamento</button>
+              </form>
             </div>
           </div>
         </div>
@@ -221,12 +223,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (finishedModal) {
     finishedModal.show();
-  }
-
-  if (terminateBtn) {
-    terminateBtn.addEventListener('click', () => {
-      window.location.href = "{{ url_for('dashboard') }}";
-    });
   }
 });
 </script>
