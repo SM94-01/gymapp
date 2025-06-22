@@ -443,20 +443,37 @@ def allenamento():
 def progressi():
     global logs_df, exercises_df
 
-    user_id = int(session.get('user_id'))
+    user_id = session.get('user_id')
     if not user_id:
         return redirect(url_for('select_user'))
+    user_id = int(user_id)
 
     user_logs = logs_df[logs_df['user_id'] == user_id].copy()
     if user_logs.empty:
         return render_template('progressi.html', message="Nessun progresso registrato.")
 
-    # Assicura che il timestamp sia datetime
     user_logs['timestamp'] = pd.to_datetime(user_logs['timestamp'])
-    user_logs['date'] = user_logs['timestamp'].dt.date  # solo data
+    user_logs['date'] = user_logs['timestamp'].dt.date
 
-    # Merge con esercizi per nome e gruppo muscolare
-    merged = user_logs.merge(exercises_df[['id', 'name', 'muscle_group']], left_on='exercise_id', right_on='id')
+    merged = user_logs.merge(
+        exercises_df[['id', 'name', 'muscle_group']],
+        left_on='exercise_id',
+        right_on='id'
+    )
+
+    print("Merged dataframe:", merged.shape)
+    print(merged.head())
+
+    merged['weight'] = pd.to_numeric(merged['weight'], errors='coerce').fillna(0)
+    merged['completed_sets'] = pd.to_numeric(merged['completed_sets'], errors='coerce').fillna(0)
+
+    daily_avg_weight = merged.groupby(['date', 'name'])['weight'].mean().reset_index()
+    print("daily_avg_weight:", daily_avg_weight.head())
+
+    daily_volume = merged.copy()
+    daily_volume['volume'] = daily_volume['weight'] * daily_volume['completed_sets']
+    daily_volume = daily_volume.groupby(['date', 'muscle_group'])['volume'].sum().reset_index()
+    print("daily_volume:", daily_volume.head())
 
     # ========================
     # 1. Grafico peso medio per esercizio (per giorno)
@@ -518,8 +535,8 @@ def progressi():
         'progressi.html',
         plot_ex=plot_ex,
         plot_muscle=plot_muscle,
-        total_sessions=total_sessions,
-        max_weight=round(max_weight, 2)
+        total_sessions=user_logs['date'].nunique(),
+        max_weight=round(user_logs['weight'].max(), 2)
     )
 
 if __name__ == '__main__':
