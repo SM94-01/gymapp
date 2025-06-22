@@ -28,7 +28,15 @@
 
 {# Mostra bottone "Avvia Allenamento" solo se allenamento non iniziato #}
 {% if exercise is none and not finished %}
-  <form method="POST" action="{{ url_for('allenamento') }}" onsubmit="disableStartButton()">
+  <form method="POST" action="{{ url_for('allenamento') }}" onsubmit="disableStartButton()" class="mb-4">
+    <div class="mb-3">
+      <label for="recupero">Durata recupero (secondi):</label>
+      <select name="recupero" id="recupero" class="form-control w-auto d-inline-block">
+        {% for sec in [30, 45, 60, 90, 120] %}
+          <option value="{{ sec }}" {% if sec == 60 %}selected{% endif %}>{{ sec }}s</option>
+        {% endfor %}
+      </select>
+    </div>
     <button class="btn btn-lg btn-primary" type="submit" name="start_workout" value="1" id="startWorkoutBtn">
       Avvia Allenamento
     </button>
@@ -147,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Timer recupero e gestione modale
   let timerInterval;
-  let timerSeconds = 60;
+  let timerSeconds = {{ session['recupero'] if session.get('recupero') else 60 }};
 
   function startTimer() {
     timerSeconds = 60;
