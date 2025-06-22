@@ -248,36 +248,34 @@ def allenamento():
     if not user_id:
         return redirect(url_for('select_user'))
 
-    # Recupera le schede attive per l'utente
+    # Recupera l’unica scheda attiva
     active_workouts = workouts_df[(workouts_df['user_id'] == user_id) & (workouts_df['active'] == True)]
 
     if active_workouts.empty:
-        flash("Nessuna scheda attiva. Attiva una scheda per iniziare l'allenamento.")
+        # Nessuna scheda attiva → mostra suggerimento con ultima usata
+        last_workout_id = get_last_workout_id_from_cycle(user_id)
+        last_used_name = None
+
+        if last_workout_id:
+            last_wk = workouts_df[(workouts_df['user_id'] == user_id) & (workouts_df['id'] == last_workout_id)]
+            if not last_wk.empty:
+                last_used_name = last_wk.iloc[0]['name']
+
+        msg = "Nessuna scheda attiva. Attiva una scheda per iniziare l'allenamento."
+        if last_used_name:
+            msg += f" Ultima scheda utilizzata: \"{last_used_name}\"."
+        flash(msg)
         return redirect(url_for('schede'))
 
-    active_workouts = active_workouts.sort_values(by='id').reset_index(drop=True)
-
-    # Seleziona il workout in ciclo
-    last_workout_id = get_last_workout_id_from_cycle(user_id)
-
-    if len(active_workouts) == 1:
-        selected_workout = active_workouts.iloc[0]
-    else:
-        ids = active_workouts['id'].tolist()
-        if last_workout_id in ids:
-            last_index = ids.index(last_workout_id)
-            next_index = (last_index + 1) % len(ids)
-        else:
-            next_index = 0
-        selected_workout = active_workouts.iloc[next_index]
-
+    # Esiste una scheda attiva
+    selected_workout = active_workouts.iloc[0]
     workout_id = selected_workout['id']
     workout_exercises = exercises_df[exercises_df['workout_id'] == workout_id].sort_values(by='id').reset_index(drop=True)
 
-    # Aggiorna ciclo
+    # Salva l’allenamento usato come ultimo nel ciclo
     set_last_workout_id_in_cycle(user_id, workout_id)
 
-    # Inizializza stato sessione
+    # Inizializza stato sessione se non esiste
     if 'exercise_index' not in session:
         session['exercise_index'] = None
         session['set_progress'] = []
@@ -298,10 +296,15 @@ def allenamento():
 
         exercise_index = session['exercise_index']
 
-        # Verifica se fuori range
+        # Verifica se abbiamo superato tutti gli esercizi
         if exercise_index >= len(workout_exercises):
+            # L’utente ha cliccato “Termina Allenamento” nel popup
+            # → Disattiva la scheda attuale
+            workouts_df.loc[workouts_df['id'] == workout_id, 'active'] = False
+            save_all()
             session.pop('exercise_index', None)
             session.pop('set_progress', None)
+            flash("Allenamento completato ✅. La scheda è stata disattivata.")
             return render_template('allenamento.html', finished=True)
 
         current_ex = workout_exercises.iloc[exercise_index]
@@ -310,7 +313,7 @@ def allenamento():
         completed_sets = data.getlist('completed_sets')
         new_weight = data.get('new_weight')
 
-        # Aggiorna peso solo per esercizio corrente
+        # Aggiorna il peso se inserito
         if new_weight:
             try:
                 new_w = float(new_weight)
@@ -319,12 +322,11 @@ def allenamento():
             except ValueError:
                 flash("Peso non valido, non aggiornato.")
 
-        # Gestione serie completate
         total_sets = current_ex['sets']
         set_progress = [str(i) in completed_sets for i in range(total_sets)]
         session['set_progress'] = set_progress
 
-        # Log esercizio
+        # Log dell'esercizio completato
         logs_df.loc[len(logs_df)] = {
             'user_id': user_id,
             'workout_id': workout_id,
@@ -335,13 +337,12 @@ def allenamento():
         }
         save_all()
 
-        # Se tutte le serie completate, passa al prossimo
+        # Se tutte le serie completate, passa al prossimo esercizio
         if all(set_progress):
             session['exercise_index'] += 1
             session['set_progress'] = []
             return redirect(url_for('allenamento'))
 
-        # Altrimenti, resta sull'esercizio attuale
         return redirect(url_for('allenamento'))
 
     # --- GET ---
@@ -351,14 +352,12 @@ def allenamento():
         return render_template('allenamento.html', finished=False, exercise=None)
 
     if exercise_index >= len(workout_exercises):
-        session.pop('exercise_index', None)
-        session.pop('set_progress', None)
+        # Fine allenamento, in attesa clic su "Termina Allenamento"
         return render_template('allenamento.html', finished=True)
 
     current_exercise = workout_exercises.iloc[exercise_index]
     set_progress = session.get('set_progress')
 
-    # Inizializza se mancante o errata
     if not set_progress or len(set_progress) != current_exercise['sets']:
         set_progress = [False] * current_exercise['sets']
         session['set_progress'] = set_progress
