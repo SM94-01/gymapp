@@ -351,17 +351,19 @@ def allenamento():
 
         # Aggiorna il peso se inserito
         if new_weight:
-            try:
-                new_w = float(new_weight)
-                exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
-                save_all()
-            except ValueError:
-                flash("Peso non valido, non aggiornato.")
-
-        total_sets = current_ex['sets']
-        set_progress = [str(i) in completed_sets for i in range(total_sets)]
-        session['set_progress'] = set_progress
-
+          try:
+              new_w = float(new_weight)
+              exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
+              save_all()
+              # Ricarica per sincronizzare
+              global exercises_df
+              exercises_df = download_excel(EXERCISES_FILE)
+          except ValueError:
+              flash("Peso non valido, non aggiornato.")
+        
+        # Dopo l'aggiornamento e ricaricamento del peso:
+        current_weight = exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'].values[0]
+        
         # Log dell'esercizio completato
         logs_df.loc[len(logs_df)] = {
             'user_id': user_id,
@@ -369,7 +371,7 @@ def allenamento():
             'exercise_id': current_ex['id'],
             'timestamp': datetime.now(),
             'completed_sets': sum(set_progress),
-            'weight': exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'].values[0]
+            'weight': current_weight
         }
         save_all()
 
