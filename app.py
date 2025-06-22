@@ -372,80 +372,86 @@ def allenamento():
 
 @app.route('/progressi')
 def progressi():
+    global logs_df, exercises_df
+
     user_id = int(session.get('user_id'))
     if not user_id:
         return redirect(url_for('select_user'))
 
-    # Filtra logs per utente
-    user_logs = logs_df[logs_df['user_id'] == user_id]
+    user_logs = logs_df[logs_df['user_id'] == user_id].copy()
     if user_logs.empty:
-        return render_template('progressi.html', message="Nessun allenamento registrato ancora.")
+        return render_template('progressi.html', message="Nessun progresso registrato.")
 
-    # Converti timestamp in datetime (se non già fatto)
+    # Assicura che il timestamp sia datetime
     user_logs['timestamp'] = pd.to_datetime(user_logs['timestamp'])
+    user_logs['date'] = user_logs['timestamp'].dt.date  # solo data
 
-    # Aggrega dati per esercizio nel tempo (media peso e volume per giorno)
-    grouped_ex = user_logs.groupby(['exercise_id', pd.Grouper(key='timestamp', freq='W')]).agg({
-        'weight': 'mean',
-        'completed_sets': 'sum'
-    }).reset_index()
+    # Merge con esercizi per nome e gruppo muscolare
+    merged = user_logs.merge(exercises_df[['id', 'name', 'muscle_group']], left_on='exercise_id', right_on='id')
 
-    # Aggiungi nome esercizio
-    merged = grouped_ex.merge(exercises_df[['id', 'name', 'muscle_group']], left_on='exercise_id', right_on='id', how='left')
+    # ========================
+    # 1. Grafico peso medio per esercizio (per giorno)
+    # ========================
+    daily_avg_weight = (
+        merged.groupby(['date', 'name'])['weight']
+        .mean()
+        .reset_index()
+    )
 
-    # Grafico 1: peso medio per esercizio nel tempo
-    plt.figure(figsize=(10,6))
-    for ex_name, group in merged.groupby('name'):
-        plt.plot(group['timestamp'], group['weight'], marker='o', label=ex_name)
-    plt.title('Peso medio per esercizio (settimanale)')
-    plt.xlabel('Settimana')
-    plt.ylabel('Peso (kg)')
-    plt.legend()
-    plt.tight_layout()
+    fig1, ax1 = plt.subplots(figsize=(8, 4))
+    for name, group in daily_avg_weight.groupby('name'):
+        ax1.plot(group['date'], group['weight'], label=name)
+    ax1.set_title("Peso medio per esercizio (giornaliero)")
+    ax1.set_xlabel("Data")
+    ax1.set_ylabel("Peso (kg)")
+    ax1.legend(fontsize=8)
+    ax1.grid(True)
+    fig1.tight_layout()
 
-    # Salva immagine in base64 per embedding in HTML
-    img = io.BytesIO()
-    plt.savefig(img, format='png')
-    plt.close()
-    img.seek(0)
-    plot_url_ex = base64.b64encode(img.getvalue()).decode()
+    buf1 = io.BytesIO()
+    fig1.savefig(buf1, format="png")
+    buf1.seek(0)
+    plot_ex = base64.b64encode(buf1.getvalue()).decode()
 
-    # Grafico 2: volume totale per gruppo muscolare nel tempo (peso * serie)
-    user_logs['volume'] = user_logs['weight'] * user_logs['completed_sets']
-    # Aggiunge 'muscle_group' a user_logs
-    user_logs = user_logs.merge(exercises_df[['id', 'muscle_group']], left_on='exercise_id', right_on='id', how='left')
+    # ========================
+    # 2. Grafico volume per gruppo muscolare (per giorno)
+    # Volume = peso * serie completate
+    # ========================
+    merged['volume'] = merged['weight'] * merged['completed_sets']
+    daily_volume = (
+        merged.groupby(['date', 'muscle_group'])['volume']
+        .sum()
+        .reset_index()
+    )
 
-    # Raggruppa per settimana e gruppo muscolare
-    grouped_muscle = user_logs.groupby([
-        pd.Grouper(key='timestamp', freq='W'),
-        'muscle_group'
-    ])['volume'].sum().unstack().fillna(0)
+    fig2, ax2 = plt.subplots(figsize=(8, 4))
+    for group, data in daily_volume.groupby('muscle_group'):
+        ax2.plot(data['date'], data['volume'], label=group)
+    ax2.set_title("Volume giornaliero per gruppo muscolare")
+    ax2.set_xlabel("Data")
+    ax2.set_ylabel("Volume (kg x serie)")
+    ax2.legend(fontsize=8)
+    ax2.grid(True)
+    fig2.tight_layout()
 
-    plt.figure(figsize=(10,6))
-    for muscle_group in grouped_muscle.columns:
-        plt.plot(grouped_muscle.index, grouped_muscle[muscle_group], marker='o', label=muscle_group)
-    plt.title('Volume totale per gruppo muscolare (settimanale)')
-    plt.xlabel('Settimana')
-    plt.ylabel('Volume (kg x serie)')
-    plt.legend()
-    plt.tight_layout()
+    buf2 = io.BytesIO()
+    fig2.savefig(buf2, format="png")
+    buf2.seek(0)
+    plot_muscle = base64.b64encode(buf2.getvalue()).decode()
 
-    img2 = io.BytesIO()
-    plt.savefig(img2, format='png')
-    plt.close()
-    img2.seek(0)
-    plot_url_muscle = base64.b64encode(img2.getvalue()).decode()
-
-    # Statistiche riepilogative
-    total_sessions = user_logs['timestamp'].nunique()
+    # ========================
+    # Statistiche riepilogo
+    # ========================
+    total_sessions = user_logs['date'].nunique()
     max_weight = user_logs['weight'].max()
 
-    return render_template('progressi.html',
-                           plot_ex=plot_url_ex,
-                           plot_muscle=plot_url_muscle,
-                           total_sessions=total_sessions,
-                           max_weight=max_weight,
-                           message=None)
+    return render_template(
+        'progressi.html',
+        plot_ex=plot_ex,
+        plot_muscle=plot_muscle,
+        total_sessions=total_sessions,
+        max_weight=round(max_weight, 2)
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
