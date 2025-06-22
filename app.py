@@ -356,7 +356,6 @@ def allenamento():
               exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
               save_all()
               # Ricarica per sincronizzare
-              global exercises_df
               exercises_df = download_excel(EXERCISES_FILE)
           except ValueError:
               flash("Peso non valido, non aggiornato.")
