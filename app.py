@@ -173,12 +173,12 @@ def schede():
     if request.method == 'POST':
         action = request.form.get('action')
         workout_id = int(request.form.get('workout_id', 0))
-        
+
         if action == 'create':
             name = request.form.get('workout_name')
             if name:
                 new_id = workouts_df['id'].max() + 1 if not workouts_df.empty else 1
-                new_row = pd.DataFrame([[new_id, user_id, name, False, False]],  # active=False, saved=False
+                new_row = pd.DataFrame([[new_id, user_id, name, False, False]],
                                        columns=['id', 'user_id', 'name', 'active', 'saved'])
                 workouts_df = pd.concat([workouts_df, new_row], ignore_index=True)
                 save_all()
@@ -214,7 +214,6 @@ def schede():
             flash("Scheda salvata e caricata su S3 ✅")
 
         elif action == 'add_exercise':
-            # Blocca modifica se scheda è salvata
             if workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]:
                 return redirect(url_for('schede'))
 
@@ -222,23 +221,44 @@ def schede():
             muscle_group = request.form.get('muscle_group')
             sets = int(request.form.get('sets'))
             reps = int(request.form.get('reps'))
-            weight = float(request.form.get('weight'))
             new_id = exercises_df['id'].max() + 1 if not exercises_df.empty else 1
-            new_ex = pd.DataFrame([[new_id, workout_id, ex_name, muscle_group, sets, reps, weight]], 
+            new_ex = pd.DataFrame([[new_id, workout_id, ex_name, muscle_group, sets, reps, None]],
                                   columns=['id', 'workout_id', 'name', 'muscle_group', 'sets', 'reps', 'weight'])
             exercises_df = pd.concat([exercises_df, new_ex], ignore_index=True)
             save_all()
 
+        elif action == 'edit_exercise':
+            exercise_id = int(request.form.get('exercise_id'))
+            if exercise_id:
+                # Assicura che l'esercizio appartenga a una scheda non salvata
+                saved_status = workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]
+                if not saved_status:
+                    # Aggiorna i dati
+                    exercises_df.loc[exercises_df['id'] == exercise_id, 'name'] = request.form.get('exercise_name')
+                    exercises_df.loc[exercises_df['id'] == exercise_id, 'muscle_group'] = request.form.get('muscle_group')
+                    exercises_df.loc[exercises_df['id'] == exercise_id, 'sets'] = int(request.form.get('sets'))
+                    exercises_df.loc[exercises_df['id'] == exercise_id, 'reps'] = int(request.form.get('reps'))
+                    save_all()
+
+        elif action == 'delete_exercise':
+            exercise_id = int(request.form.get('exercise_id'))
+            # Assicura che la scheda non sia salvata prima di eliminare
+            if workout_id > 0 and not workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]:
+                exercises_df = exercises_df[exercises_df['id'] != exercise_id]
+                save_all()
+
         return redirect(url_for('schede'))
 
-    # Prepara dati
+    # GET: prepara dati
     user_workouts = workouts_df[workouts_df['user_id'] == user_id]
     exercises_map = {
         wid: exercises_df[exercises_df['workout_id'] == wid].to_dict('records')
         for wid in user_workouts['id']
     }
 
-    return render_template('schede.html', workouts=user_workouts.to_dict('records'), exercises_map=exercises_map)
+    return render_template('schede.html',
+                           workouts=user_workouts.to_dict('records'),
+                           exercises_map=exercises_map)
 
 @app.route('/allenamento', methods=['GET', 'POST'])
 def allenamento():
