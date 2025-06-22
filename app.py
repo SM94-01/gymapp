@@ -349,16 +349,20 @@ def allenamento():
 
         # AJAX → SOLO aggiornamento peso
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            new_weight = data.get('new_weight')
-            if new_weight:
-                try:
-                    new_w = float(new_weight)
-                    exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
-                    save_all()
-                    exercises_df = download_excel(EXERCISES_FILE)
-                    return '', 204
-                except ValueError:
-                    return 'Peso non valido', 400
+          new_weight = data.get('new_weight')
+          if new_weight:
+              try:
+                  new_w = float(new_weight)
+                  exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
+      
+                  # Salva direttamente exercises_df sul file Excel corretto
+                  exercises_df.to_excel(EXERCISES_FILE, index=False)
+      
+                  # Ricarica per sicurezza
+                  exercises_df = download_excel(EXERCISES_FILE)
+                  return '', 204
+              except ValueError:
+                  return 'Peso non valido', 400
 
         # FORM CLASSICO → aggiorna peso + salva log
         completed_sets = data.getlist('completed_sets')
