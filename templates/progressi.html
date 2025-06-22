@@ -9,6 +9,28 @@
   <div class="alert alert-info">{{ message }}</div>
 {% else %}
   <p class="text-muted small">I grafici mostrano l'andamento in base all'orario preciso di esecuzione (non solo per giorno).</p>
+  
+  <form method="get" class="row mb-4">
+    <div class="col-md-3">
+      <label for="mese">Mese</label>
+      <select name="mese" id="mese" class="form-control">
+        {% for m in mesi %}
+          <option value="{{ m[0] }}" {% if m[0] == mese_corrente %}selected{% endif %}>{{ m[1] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label for="anno">Anno</label>
+      <select name="anno" id="anno" class="form-control">
+        {% for a in anni %}
+          <option value="{{ a }}" {% if a == anno_corrente %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 align-self-end">
+      <button type="submit" class="btn btn-primary">Filtra</button>
+    </div>
+  </form>
 
   <div class="row">
     <div class="col-md-6">
