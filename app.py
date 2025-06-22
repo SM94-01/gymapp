@@ -328,7 +328,7 @@ def allenamento():
     # Salva come ultima scheda usata
     set_last_workout_id_in_cycle(user_id, workout_id)
 
-    # Inizializza sessione
+    # Inizializza sessione se non già avviata
     if 'exercise_index' not in session:
         session['exercise_index'] = None
         session['set_progress'] = []
@@ -341,6 +341,14 @@ def allenamento():
         if 'start_workout' in data:
             session['exercise_index'] = 0
             session['set_progress'] = []
+
+            # Salva la durata del recupero nella sessione
+            recupero = request.form.get('recupero', 60)
+            try:
+                session['recupero'] = int(recupero)
+            except ValueError:
+                session['recupero'] = 60  # fallback in caso di errore
+
             return redirect(url_for('allenamento'))
 
         # TERMINA ALLENAMENTO
@@ -349,6 +357,7 @@ def allenamento():
             save_all()
             session.pop('exercise_index', None)
             session.pop('set_progress', None)
+            session.pop('recupero', None)
             flash("Allenamento completato ✅. La scheda è stata disattivata.")
             return render_template('allenamento.html', finished=True)
 
@@ -359,24 +368,20 @@ def allenamento():
 
         current_ex = workout_exercises.iloc[exercise_index]
 
-        # AJAX → SOLO aggiornamento peso
+        # AJAX → aggiornamento peso asincrono
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-          new_weight = data.get('new_weight')
-          if new_weight:
-              try:
-                  new_w = float(new_weight)
-                  exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
-      
-                  # Salva direttamente exercises_df sul file Excel corretto
-                  exercises_df.to_excel(EXERCISES_FILE, index=False)
-      
-                  # Ricarica per sicurezza
-                  exercises_df = download_excel(EXERCISES_FILE)
-                  return '', 204
-              except ValueError:
-                  return 'Peso non valido', 400
+            new_weight = data.get('new_weight')
+            if new_weight:
+                try:
+                    new_w = float(new_weight)
+                    exercises_df.loc[exercises_df['id'] == current_ex['id'], 'weight'] = new_w
+                    exercises_df.to_excel(EXERCISES_FILE, index=False)
+                    exercises_df = download_excel(EXERCISES_FILE)
+                    return '', 204
+                except ValueError:
+                    return 'Peso non valido', 400
 
-        # FORM CLASSICO → aggiorna peso + salva log
+        # FORM CLASSICO → aggiornamento peso e set completati
         completed_sets = data.getlist('completed_sets')
         new_weight = data.get('new_weight')
 
@@ -389,7 +394,7 @@ def allenamento():
             except ValueError:
                 flash("Peso non valido, non aggiornato.")
 
-        # Aggiorna stato set
+        # Aggiorna stato serie
         set_progress = [str(i) in completed_sets for i in range(current_ex['sets'])]
         session['set_progress'] = set_progress
 
@@ -399,7 +404,7 @@ def allenamento():
                 exercises_df['id'] == current_ex['id'], 'weight'
             ].values[0]
             if pd.isna(current_weight):
-                current_weight = 0.0  # fallback per sicurezza
+                current_weight = 0.0
             logs_df.loc[len(logs_df)] = {
                 'user_id': user_id,
                 'workout_id': workout_id,
@@ -410,7 +415,7 @@ def allenamento():
             }
             save_all()
 
-        # Passa al prossimo esercizio
+        # Passa al prossimo esercizio se tutte le serie completate
         if all(set_progress):
             session['exercise_index'] += 1
             session['set_progress'] = []
@@ -422,25 +427,35 @@ def allenamento():
     exercise_index = session.get('exercise_index')
 
     if exercise_index is None:
-        return render_template('allenamento.html', finished=False, exercise=None)
+        return render_template(
+            'allenamento.html',
+            finished=False,
+            exercise=None,
+            recupero=session.get('recupero', 60)
+        )
 
     if exercise_index >= len(workout_exercises):
-        return render_template('allenamento.html', finished=True)
+        return render_template(
+            'allenamento.html',
+            finished=True,
+            recupero=session.get('recupero', 60)
+        )
 
     current_exercise = workout_exercises.iloc[exercise_index]
 
-    # Inizializza set progress
+    # Inizializza progressi serie se non esistenti o incoerenti
     set_progress = session.get('set_progress')
     if not set_progress or len(set_progress) != current_exercise['sets']:
         set_progress = [False] * current_exercise['sets']
         session['set_progress'] = set_progress
 
-    # Recupera peso aggiornato
+    # Recupera peso
     current_weight = exercises_df.loc[
         exercises_df['id'] == current_exercise['id'], 'weight'
     ].values[0]
     if pd.isna(current_weight):
         current_weight = None
+
     current_exercise_dict = current_exercise.to_dict()
     current_exercise_dict['weight'] = current_weight
 
@@ -448,7 +463,8 @@ def allenamento():
         'allenamento.html',
         exercise=current_exercise_dict,
         set_progress=set_progress,
-        finished=False
+        finished=False,
+        recupero=session.get('recupero', 60)
     )
   
 @app.route('/progressi')
