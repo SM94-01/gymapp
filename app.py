@@ -1,5 +1,3 @@
-# Questo è il backend Flask equivalente della tua app Streamlit, usando file Excel invece di SQLite
-
 from flask import Flask, request, render_template, redirect, url_for, session, flash
 import pandas as pd
 from datetime import datetime
