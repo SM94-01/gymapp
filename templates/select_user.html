@@ -3,30 +3,28 @@
 {% block title %}Seleziona Utente - GymApp{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">👤 Seleziona un utente esistente o ➕ aggiungi un nuovo utente</h2>
+<h2 class="mb-4">Seleziona un utente esistente o aggiungi un nuovo utente</h2>
 
-<!-- Form selezione utente esistente -->
 <form method="POST" class="mb-4">
   <div class="mb-3">
-    <label for="user_id" class="form-label">📋 Utenti esistenti:</label>
+    <label for="user_id" class="form-label">Utenti esistenti:</label>
     <select class="form-select" id="user_id" name="user_id" required>
       {% for user in users %}
-      <option value="{{ user.id }}">👤 {{ user.name }}</option>
+      <option value="{{ user.id }}">{{ user.name }}</option>
       {% endfor %}
     </select>
   </div>
 
-  <button type="submit" class="btn btn-primary">✅ Seleziona</button>
+  <button type="submit" class="btn btn-primary">Seleziona</button>
 </form>
 
 <hr>
 
-<!-- Form aggiunta nuovo utente -->
 <form method="POST">
   <div class="mb-3">
-    <label for="new_user" class="form-label">🆕 Aggiungi nuovo utente:</label>
-    <input type="text" class="form-control" id="new_user" name="new_user" placeholder="✍️ Nome utente" />
+    <label for="new_user" class="form-label">Aggiungi nuovo utente:</label>
+    <input type="text" class="form-control" id="new_user" name="new_user" placeholder="Nome utente" />
   </div>
-  <button type="submit" class="btn btn-success">➕ Aggiungi e seleziona</button>
+  <button type="submit" class="btn btn-success">Aggiungi e seleziona</button>
 </form>
 {% endblock %}
