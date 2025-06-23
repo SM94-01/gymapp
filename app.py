@@ -28,6 +28,7 @@ WORKOUTS_FILE = "workouts.xlsx"
 EXERCISES_FILE = "exercises.xlsx"
 LOGS_FILE = "logs.xlsx"
 CYCLE_FILE = "cycle.xlsx"
+WEIGHTS_FILE = "weights.xlsx"
 
 s3 = boto3.client('s3',
                   aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -52,21 +53,21 @@ def download_excel(file_name):
         df = pd.read_excel(io.BytesIO(s3_obj['Body'].read()))
         return df
     except Exception:
-        # Se il file non esiste, crea DataFrame vuoti con colonne giuste
         if file_name == USERS_FILE:
             df = pd.DataFrame(columns=['id', 'name'])
         elif file_name == WORKOUTS_FILE:
-            df = pd.DataFrame(columns=['id', 'user_id', 'name', 'active'])
+            df = pd.DataFrame(columns=['id', 'user_id', 'name', 'active', 'saved'])
         elif file_name == EXERCISES_FILE:
-            df = pd.DataFrame(columns=['id', 'user_id', 'workout_id', 'name', 'sets', 'reps', 'weight'])
+            df = pd.DataFrame(columns=['id', 'workout_id', 'name', 'muscle_group', 'sets', 'reps', 'weight'])
         elif file_name == LOGS_FILE:
             df = pd.DataFrame(columns=['user_id', 'workout_id', 'exercise_id', 'timestamp', 'completed_sets', 'weight'])
         elif file_name == CYCLE_FILE:
             df = pd.DataFrame(columns=['user_id', 'last_workout_id'])
+        elif file_name == WEIGHTS_FILE:
+            df = pd.DataFrame(columns=['user_id', 'date', 'weight'])
         else:
             df = pd.DataFrame()
         
-        # Carica subito su S3 così esistono i file
         out_buffer = io.BytesIO()
         df.to_excel(out_buffer, index=False)
         out_buffer.seek(0)
@@ -85,14 +86,80 @@ def save_all():
     upload_excel(exercises_df, EXERCISES_FILE)
     upload_excel(logs_df, LOGS_FILE)
     upload_excel(cycle_df, CYCLE_FILE)
+    upload_excel(weights_df, WEIGHTS_FILE)
 
 def load_all():
-    global users_df, workouts_df, exercises_df, logs_df, cycle_df
+    global users_df, workouts_df, exercises_df, logs_df, cycle_df, weights_df
     users_df = download_excel(USERS_FILE)
     workouts_df = download_excel(WORKOUTS_FILE)
     exercises_df = download_excel(EXERCISES_FILE)
     logs_df = download_excel(LOGS_FILE)
     cycle_df = download_excel(CYCLE_FILE)
+    weights_df = download_excel(WEIGHTS_FILE)
+
+# Caricamento peso iniziale
+load_all()
+@app.route('/weight', methods=['GET', 'POST'])
+def weight():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('select_user'))
+    
+    global weights_df
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    
+    if request.method == 'POST':
+        weight_value = request.form.get('weight')
+        if weight_value:
+            try:
+                weight_float = float(weight_value)
+                # Verifica se già presente record per oggi
+                existing_idx = weights_df[(weights_df['user_id'] == user_id) & (weights_df['date'] == today_str)].index
+                if not existing_idx.empty:
+                    # Aggiorna peso
+                    weights_df.loc[existing_idx, 'weight'] = weight_float
+                else:
+                    # Nuovo record
+                    new_row = pd.DataFrame([{'user_id': user_id, 'date': today_str, 'weight': weight_float}])
+                    weights_df = pd.concat([weights_df, new_row], ignore_index=True)
+                save_all()
+                flash('Peso aggiornato con successo!')
+                return redirect(url_for('weight'))
+            except ValueError:
+                flash('Inserisci un valore numerico valido per il peso.')
+    
+    # Recupera dati peso utente, ordinati per data
+    user_weights = weights_df[weights_df['user_id'] == user_id].copy()
+    user_weights['date'] = pd.to_datetime(user_weights['date'])
+    user_weights = user_weights.sort_values('date')
+    
+    # Codice per generare grafico con matplotlib in base64
+    img = None
+    if not user_weights.empty:
+        fig, ax = plt.subplots(figsize=(8,4))
+        ax.plot(user_weights['date'], user_weights['weight'], marker='o')
+        ax.set_title('Andamento peso')
+        ax.set_xlabel('Data')
+        ax.set_ylabel('Peso (kg)')
+        ax.grid(True)
+        fig.autofmt_xdate()
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        img = base64.b64encode(buf.getvalue()).decode()
+        plt.close(fig)
+    
+    # Peso odierno se già inserito
+    today_weight = user_weights.loc[user_weights['date'] == pd.to_datetime(today_str), 'weight']
+    if not today_weight.empty:
+        today_weight = today_weight.values[0]
+    else:
+        today_weight = ''
+    
+    return render_template('weight.html',
+                           today=today_str,
+                           today_weight=today_weight,
+                           weight_chart=img)
 
 def get_all_users():
     # Ritorna la lista di utenti dal DataFrame users_df
@@ -223,7 +290,6 @@ def schede():
             sheet = workouts_df[workouts_df['id'] == workout_id]
             sheet_ex = exercises_df[exercises_df['workout_id'] == workout_id]
 
-            # Esporta su Excel e carica su S3
             with BytesIO() as buffer:
                 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                     sheet.to_excel(writer, sheet_name='Workout', index=False)
@@ -237,9 +303,7 @@ def schede():
             flash("Scheda salvata e caricata su S3 ✅")
 
         elif action == 'add_exercise':
-            if workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]:
-                return redirect(url_for('schede'))
-
+            # Rimosso controllo 'saved', permetto sempre di aggiungere esercizi
             ex_name = request.form.get('exercise_name')
             muscle_group = request.form.get('muscle_group')
             sets = int(request.form.get('sets'))
@@ -254,21 +318,18 @@ def schede():
         elif action == 'edit_exercise':
             exercise_id = int(request.form.get('exercise_id'))
             if exercise_id:
-                # Assicura che l'esercizio appartenga a una scheda non salvata
-                saved_status = workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]
-                if not saved_status:
-                    # Aggiorna i dati
-                    exercises_df.loc[exercises_df['id'] == exercise_id, 'name'] = request.form.get('exercise_name')
-                    exercises_df.loc[exercises_df['id'] == exercise_id, 'muscle_group'] = request.form.get('muscle_group')
-                    exercises_df.loc[exercises_df['id'] == exercise_id, 'sets'] = int(request.form.get('sets'))
-                    exercises_df.loc[exercises_df['id'] == exercise_id, 'reps'] = int(request.form.get('reps'))
-                    save_all()
-                    load_all()
+                # Rimosso controllo 'saved', permetto sempre modifica
+                exercises_df.loc[exercises_df['id'] == exercise_id, 'name'] = request.form.get('exercise_name')
+                exercises_df.loc[exercises_df['id'] == exercise_id, 'muscle_group'] = request.form.get('muscle_group')
+                exercises_df.loc[exercises_df['id'] == exercise_id, 'sets'] = int(request.form.get('sets'))
+                exercises_df.loc[exercises_df['id'] == exercise_id, 'reps'] = int(request.form.get('reps'))
+                save_all()
+                load_all()
 
         elif action == 'delete_exercise':
             exercise_id = int(request.form.get('exercise_id'))
-            # Assicura che la scheda non sia salvata prima di eliminare
-            if workout_id > 0 and not workouts_df.loc[workouts_df['id'] == workout_id, 'saved'].values[0]:
+            if workout_id > 0:
+                # Rimosso controllo 'saved', permetto sempre eliminazione
                 exercises_df = exercises_df[exercises_df['id'] != exercise_id]
                 save_all()
                 load_all()
