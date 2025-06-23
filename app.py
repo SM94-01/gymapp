@@ -28,7 +28,6 @@ WORKOUTS_FILE = "workouts.xlsx"
 EXERCISES_FILE = "exercises.xlsx"
 LOGS_FILE = "logs.xlsx"
 CYCLE_FILE = "cycle.xlsx"
-PESO_FILE = "peso.xlsx"
 
 s3 = boto3.client('s3',
                   aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -86,16 +85,14 @@ def save_all():
     upload_excel(exercises_df, EXERCISES_FILE)
     upload_excel(logs_df, LOGS_FILE)
     upload_excel(cycle_df, CYCLE_FILE)
-    upload_excel(peso_df, PESO_FILE)
 
 def load_all():
-    global users_df, workouts_df, exercises_df, logs_df, cycle_df, peso_df
+    global users_df, workouts_df, exercises_df, logs_df, cycle_df
     users_df = download_excel(USERS_FILE)
     workouts_df = download_excel(WORKOUTS_FILE)
     exercises_df = download_excel(EXERCISES_FILE)
     logs_df = download_excel(LOGS_FILE)
     cycle_df = download_excel(CYCLE_FILE)
-    peso_df = download_excel(PESO_FILE)
 
 def get_all_users():
     # Ritorna la lista di utenti dal DataFrame users_df
@@ -182,77 +179,6 @@ def dashboard():
     if not user_id:
         return redirect(url_for('select_user'))
     return render_template('dashboard.html')
-
-peso_df = download_excel(PESO_FILE)
-
-@app.route('/peso', methods=['GET', 'POST'])
-def peso():
-    user_id = session.get('user_id')
-    if not user_id:
-        return redirect(url_for('select_user'))
-
-    today = datetime.now().date()
-
-    if request.method == 'POST':
-        try:
-            peso_val = float(request.form['peso'])
-            date_str = request.form.get('date') or str(today)
-            date = datetime.strptime(date_str, "%Y-%m-%d").date()
-
-            global peso_df
-            # Elimina eventuale peso registrato per la stessa data e utente
-            peso_df = peso_df[~((peso_df['user_id'] == user_id) & (peso_df['date'] == str(date)))]
-            # Aggiungi nuova riga
-            new_row = pd.DataFrame([{
-                'user_id': user_id,
-                'date': str(date),
-                'peso': peso_val
-            }])
-            peso_df = pd.concat([peso_df, new_row], ignore_index=True)
-            upload_excel(peso_df, PESO_FILE)
-            flash("Peso aggiornato con successo")
-        except ValueError:
-            flash("Valore del peso non valido.")
-
-    # Filtro mese/anno
-    mese = int(request.args.get('mese', today.month))
-    anno = int(request.args.get('anno', today.year))
-
-    df_filtered = peso_df[(peso_df['user_id'] == user_id)]
-    df_filtered['date'] = pd.to_datetime(df_filtered['date'])
-    df_filtered = df_filtered[df_filtered['date'].dt.month == mese]
-    df_filtered = df_filtered[df_filtered['date'].dt.year == anno]
-    df_filtered = df_filtered.sort_values('date')
-
-    # Genera grafico
-    fig, ax = plt.subplots()
-    if not df_filtered.empty:
-        ax.plot(df_filtered['date'], df_filtered['peso'], marker='o')
-        ax.set_title('Andamento Peso')
-        ax.set_xlabel('Data')
-        ax.set_ylabel('Peso (kg)')
-        ax.grid(True)
-    else:
-        ax.text(0.5, 0.5, 'Nessun dato disponibile', horizontalalignment='center', verticalalignment='center')
-        ax.axis('off')
-
-    img = BytesIO()
-    plt.tight_layout()
-    fig.savefig(img, format='png')
-    img.seek(0)
-    chart_base64 = base64.b64encode(img.read()).decode('utf-8')
-    plt.close(fig)
-
-    mesi = get_mesi()
-    anni = sorted(peso_df[peso_df['user_id'] == user_id]['date'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d").year).unique()) if not peso_df.empty else [today.year]
-
-    return render_template('peso.html',
-                           today=today,
-                           chart=chart_base64,
-                           selected_mese=mese,
-                           selected_anno=anno,
-                           mesi=mesi,
-                           anni=anni)
 
 @app.route('/schede', methods=['GET', 'POST'])
 def schede():
