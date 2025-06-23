@@ -70,12 +70,20 @@
           <div class="btn-group btn-group-sm">
             <!-- Bottone modifica -->
             <button type="button" class="btn btn-outline-primary"
-              onclick="showEditExerciseForm({{ workout.id }}, {{ ex.id }}, '{{ ex.name }}', {{ ex.sets }}, {{ ex.reps }}, '{{ ex.muscle_group }}')">Modifica</button>
+              onclick="showEditExerciseForm(
+                {{ workout.id }},
+                {{ ex.id }},
+                '{{ ex.name | escapejs }}',
+                {{ ex.sets }},
+                {{ ex.reps }},
+                '{{ ex.muscle_group | escapejs }}'
+              )">Modifica</button>
 
             <!-- Bottone elimina -->
             <form method="POST" onsubmit="return confirm('Eliminare questo esercizio?');">
               <input type="hidden" name="action" value="delete_exercise" />
               <input type="hidden" name="exercise_id" value="{{ ex.id }}" />
+              <input type="hidden" name="workout_id" value="{{ workout.id }}" />
               <button type="submit" class="btn btn-outline-danger">Elimina</button>
             </form>
           </div>
@@ -120,7 +128,7 @@
     {% endif %}
 
     <!-- Form modifica esercizio -->
-    <form method="POST" id="editExerciseForm" class="row g-2 d-none">
+    <form method="POST" id="editExerciseForm" class="row g-2 d-none mt-4">
       <input type="hidden" name="action" value="edit_exercise" />
       <input type="hidden" name="exercise_id" id="editExerciseId" />
       <input type="hidden" name="workout_id" id="editWorkoutId" />
