@@ -147,11 +147,12 @@ document.addEventListener('DOMContentLoaded', function () {
     alertModal.show();
   }
 
-  // Usa la durata di recupero dalla sessione Flask
   let timerSeconds = {{ session['recupero'] if session.get('recupero') else 60 }};
   let timerInterval;
 
   function startTimer() {
+    clearInterval(timerInterval); // Ferma il timer precedente
+    timerSeconds = {{ session['recupero'] if session.get('recupero') else 60 }}; // Resetta il timer
     document.getElementById('restModalLabel').textContent = `Recupero: ${timerSeconds} secondi`;
     timerInterval = setInterval(() => {
       timerSeconds--;
@@ -188,6 +189,9 @@ document.addEventListener('DOMContentLoaded', function () {
           restModal.show();
           weightFormContainer.style.display = 'block';
           startTimer();
+        } else {
+          restModal.hide();
+          clearInterval(timerInterval);
         }
 
         const allChecked = Array.from(checkboxes).every(cb => cb.checked);
